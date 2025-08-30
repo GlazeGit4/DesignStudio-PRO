@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DesignStudio Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .canvas-area {
+            background-image: 
+                linear-gradient(rgba(0,0,0,.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,0,0,.1) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+        .design-element {
+            position: absolute;
+            cursor: move;
+            border: 2px dashed transparent;
+        }
+        .design-element:hover {
+            border-color: #3b82f6;
+        }
+        .design-element.selected {
+            border-color: #ef4444;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+    <!-- Header -->
+    <header class="bg-gray-800 border-b border-gray-700 p-4">
+        <div class="flex items-center justify-between">
+            <h1 class="text-2xl font-bold text-blue-400">DesignStudio Pro</h1>
+            <div class="flex gap-3">
+                <button onclick="clearCanvas()" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg transition-colors">
+                    Clear Canvas
+                </button>
+                <button onclick="downloadDesign()" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg transition-colors">
+                    Download Design
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <div class="flex h-screen">
+        <!-- Sidebar -->
+        <div class="w-80 bg-gray-800 border-r border-gray-700 p-4 overflow-y-auto">
+            <h2 class="text-lg font-semibold mb-4 text-blue-300">Tools & Assets</h2>
+            
+            <!-- File Upload Section -->
+            <div class="mb-6">
+                <h3 class="text-md font-medium mb-3 text-gray-300">Upload Media</h3>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-2">Images (PNG, JPG, GIF)</label>
+                        <input type="file" id="imageUpload" accept=".png,.jpg,.jpeg,.gif" multiple 
+                               class="w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-2">Videos (MP4, WebM)</label>
+                        <input type="file" id="videoUpload" accept=".mp4,.webm" multiple 
+                               class="w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-purple-600 file:text-white hover:file:bg-purple-700">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-2">Audio (MP3, WAV) - Demo</label>
+                        <input type="file" id="audioUpload" accept=".mp3,.wav" multiple 
+                               class="w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-orange-600 file:text-white hover:file:bg-orange-700">
+                        <p class="text-xs text-gray-500 mt-1">Audio playback not supported in demo</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Design Elements -->
+            <div class="mb-6">
+                <h3 class="text-md font-medium mb-3 text-gray-300">Design Elements</h3>
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="addText()" class="bg-blue-600 hover:bg-blue-700 p-3 rounded-lg text-sm transition-colors">
+                        Add Text
+                    </button>
+                    <button onclick="addShape('rectangle')" class="bg-green-600 hover:bg-green-700 p-3 rounded-lg text-sm transition-colors">
+                        Rectangle
+                    </button>
+                    <button onclick="addShape('circle')" class="bg-yellow-600 hover:bg-yellow-700 p-3 rounded-lg text-sm transition-colors">
+                        Circle
+                    </button>
+                    <button onclick="addIcon()" class="bg-purple-600 hover:bg-purple-700 p-3 rounded-lg text-sm transition-colors">
+                        Add Icon
+                    </button>
+                </div>
+            </div>
+
+            <!-- Uploaded Files -->
+            <div class="mb-6">
+                <h3 class="text-md font-medium mb-3 text-gray-300">Uploaded Files</h3>
+                <div id="uploadedFiles" class="space-y-2 max-h-60 overflow-y-auto">
+                    <p class="text-sm text-gray-500">No files uploaded yet</p>
+                </div>
+            </div>
+
+            <!-- Properties Panel -->
+            <div id="propertiesPanel" class="hidden">
+                <h3 class="text-md font-medium mb-3 text-gray-300">Properties</h3>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Color</label>
+                        <input type="color" id="colorPicker" class="w-full h-10 rounded border-0">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Size</label>
+                        <input type="range" id="sizePicker" min="10" max="200" value="100" class="w-full">
+                    </div>
+                    <button onclick="deleteSelected()" class="w-full bg-red-600 hover:bg-red-700 p-2 rounded-lg text-sm transition-colors">
+                        Delete Element
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Canvas Area -->
+        <div class="flex-1 p-4">
+            <div id="canvas" class="canvas-area bg-white w-full h-full rounded-lg relative overflow-hidden">
+                <!-- Design elements will be added here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedElement = null;
+        let elementCounter = 0;
+        let uploadedFiles = [];
+
+        // File upload handlers
+        document.getElementById('imageUpload').addEventListener('change', handleImageUpload);
+        document.getElementById('videoUpload').addEventListener('change', handleVideoUpload);
+        document.getElementById('audioUpload').addEventListener('change', handleAudioUpload);
+
+        function handleImageUpload(event) {
+            const files = Array.from(event.target.files);
+            files.forEach(file => {
+                if (file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const fileData = {
+                            id: Date.now() + Math.random(),
+                            name: file.name,
+                            type: 'image',
+                            data: e.target.result
+                        };
+                        uploadedFiles.push(fileData);
+                        updateUploadedFilesList();
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        }
+
+        function handleVideoUpload(event) {
+            const files = Array.from(event.target.files);
+            files.forEach(file => {
+                if (file.type.startsWith('video/')) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const fileData = {
+                            id: Date.now() + Math.random(),
+                            name: file.name,
+                            type: 'video',
+                            data: e.target.result
+                        };
+                        uploadedFiles.push(fileData);
+                        updateUploadedFilesList();
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        }
+
+        function handleAudioUpload(event) {
+            const files = Array.from(event.target.files);
+            files.forEach(file => {
+                if (file.type.startsWith('audio/')) {
+                    const fileData = {
+                        id: Date.now() + Math.random(),
+                        name: file.name,
+                        type: 'audio',
+                        data: 'Audio file uploaded (playback not supported in demo)'
+                    };
+                    uploadedFiles.push(fileData);
+                    updateUploadedFilesList();
+                }
+            });
+        }
+
+        function updateUploadedFilesList() {
+            const container = document.getElementById('uploadedFiles');
+            if (uploadedFiles.length === 0) {
+                container.innerHTML = '<p class="text-sm text-gray-500">No files uploaded yet</p>';
+                return;
+            }
+
+            container.innerHTML = uploadedFiles.map(file => `
+                <div class="bg-gray-700 p-2 rounded cursor-pointer hover:bg-gray-600 transition-colors" 
+                     onclick="addUploadedFile('${file.id}')">
+                    <div class="text-sm font-medium">${file.name}</div>
+                    <div class="text-xs text-gray-400">${file.type}</div>
+                </div>
+            `).join('');
+        }
+
+        function addUploadedFile(fileId) {
+            const file = uploadedFiles.find(f => f.id == fileId);
+            if (!file) return;
+
+            const canvas = document.getElementById('canvas');
+            const element = document.createElement('div');
+            element.className = 'design-element';
+            element.id = `element-${++elementCounter}`;
+            element.style.left = '50px';
+            element.style.top = '50px';
+
+            if (file.type === 'image') {
+                element.innerHTML = `<img src="${file.data}" alt="${file.name}" style="max-width: 200px; max-height: 200px; border-radius: 8px;">`;
+            } else if (file.type === 'video') {
+                element.innerHTML = `<video controls style="max-width: 300px; max-height: 200px; border-radius: 8px;">
+                    <source src="${file.data}" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>`;
+            } else if (file.type === 'audio') {
+                element.innerHTML = `<div class="bg-orange-100 text-orange-800 p-4 rounded-lg border-2 border-orange-300">
+                    <div class="font-medium">🎵 ${file.name}</div>
+                    <div class="text-sm">Audio file (demo mode)</div>
+                </div>`;
+            }
+
+            makeDraggable(element);
+            canvas.appendChild(element);
+        }
+
+        function addText() {
+            const canvas = document.getElementById('canvas');
+            const element = document.createElement('div');
+            element.className = 'design-element';
+            element.id = `element-${++elementCounter}`;
+            element.style.left = '100px';
+            element.style.top = '100px';
+            element.innerHTML = '<div contenteditable="true" class="text-black text-xl font-bold p-2 bg-transparent border-none outline-none">Edit this text</div>';
+            
+            makeDraggable(element);
+            canvas.appendChild(element);
+        }
+
+        function addShape(type) {
+            const canvas = document.getElementById('canvas');
+            const element = document.createElement('div');
+            element.className = 'design-element';
+            element.id = `element-${++elementCounter}`;
+            element.style.left = '150px';
+            element.style.top = '150px';
+            
+            if (type === 'rectangle') {
+                element.innerHTML = '<div class="w-24 h-16 bg-blue-500 rounded-lg"></div>';
+            } else if (type === 'circle') {
+                element.innerHTML = '<div class="w-20 h-20 bg-green-500 rounded-full"></div>';
+            }
+            
+            makeDraggable(element);
+            canvas.appendChild(element);
+        }
+
+        function addIcon() {
+            const icons = ['⭐', '❤️', '🎨', '🚀', '💡', '🎯', '🔥', '✨'];
+            const randomIcon = icons[Math.floor(Math.random() * icons.length)];
+            
+            const canvas = document.getElementById('canvas');
+            const element = document.createElement('div');
+            element.className = 'design-element';
+            element.id = `element-${++elementCounter}`;
+            element.style.left = '200px';
+            element.style.top = '200px';
+            element.innerHTML = `<div class="text-4xl">${randomIcon}</div>`;
+            
+            makeDraggable(element);
+            canvas.appendChild(element);
+        }
+
+        function makeDraggable(element) {
+            let isDragging = false;
+            let startX, startY, initialLeft, initialTop;
+
+            element.addEventListener('mousedown', function(e) {
+                isDragging = true;
+                startX = e.clientX;
+                startY = e.clientY;
+                initialLeft = parseInt(element.style.left);
+                initialTop = parseInt(element.style.top);
+                
+                selectElement(element);
+                e.preventDefault();
+            });
+
+            document.addEventListener('mousemove', function(e) {
+                if (!isDragging) return;
+                
+                const deltaX = e.clientX - startX;
+                const deltaY = e.clientY - startY;
+                
+                element.style.left = (initialLeft + deltaX) + 'px';
+                element.style.top = (initialTop + deltaY) + 'px';
+            });
+
+            document.addEventListener('mouseup', function() {
+                isDragging = false;
+            });
+        }
+
+        function selectElement(element) {
+            // Remove selection from all elements
+            document.querySelectorAll('.design-element').forEach(el => {
+                el.classList.remove('selected');
+            });
+            
+            // Select current element
+            element.classList.add('selected');
+            selectedElement = element;
+            
+            // Show properties panel
+            document.getElementById('propertiesPanel').classList.remove('hidden');
+        }
+
+        function deleteSelected() {
+            if (selectedElement) {
+                selectedElement.remove();
+                selectedElement = null;
+                document.getElementById('propertiesPanel').classList.add('hidden');
+            }
+        }
+
+        function clearCanvas() {
+            document.getElementById('canvas').innerHTML = '';
+            selectedElement = null;
+            document.getElementById('propertiesPanel').classList.add('hidden');
+        }
+
+        function downloadDesign() {
+            const canvas = document.getElementById('canvas');
+            const canvasRect = canvas.getBoundingClientRect();
+            
+            // Create a temporary canvas for export
+            const exportCanvas = document.createElement('canvas');
+            exportCanvas.width = canvasRect.width;
+            exportCanvas.height = canvasRect.height;
+            const ctx = exportCanvas.getContext('2d');
+            
+            // Fill background
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+            
+            // Simple text export for demo
+            ctx.fillStyle = 'black';
+            ctx.font = '20px Arial';
+            ctx.fillText('Design Export - DesignStudio Pro', 50, 50);
+            ctx.fillText(`Elements: ${document.querySelectorAll('.design-element').length}`, 50, 80);
+            ctx.fillText('Full export with media coming soon!', 50, 110);
+            
+            // Download
+            const link = document.createElement('a');
+            link.download = 'design-export.png';
+            link.href = exportCanvas.toDataURL();
+            link.click();
+        }
+
+        // Color and size picker handlers
+        document.getElementById('colorPicker').addEventListener('change', function(e) {
+            if (selectedElement) {
+                const colorableElement = selectedElement.querySelector('div');
+                if (colorableElement) {
+                    colorableElement.style.backgroundColor = e.target.value;
+                }
+            }
+        });
+
+        document.getElementById('sizePicker').addEventListener('input', function(e) {
+            if (selectedElement) {
+                const scale = e.target.value / 100;
+                selectedElement.style.transform = `scale(${scale})`;
+            }
+        });
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'97493f4262f4677e',t:'MTc1NjEwNTU5MC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
